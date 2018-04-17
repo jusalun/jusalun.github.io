@@ -1,0 +1,48 @@
+
+                                    declare @BatchID uniqueidentifier
+
+                                    set @BatchID = newid()
+
+                                    UPDATE [Notifications] WITH (TABLOCKX)
+                                        SET [BatchID] = @BatchID,
+                                        [ProcessStart] = GETUTCDATE(),
+                                        [ProcessHeartbeat] = GETUTCDATE()
+                                    FROM (
+                                        SELECT TOP 4  [NotificationID] FROM [Notifications] WITH (TABLOCKX) WHERE ProcessStart is NULL and
+	                                    (ProcessAfter is NULL or ProcessAfter < GETUTCDATE()) ORDER BY [NotificationEntered]
+                                    ) AS t1
+                                    WHERE [Notifications].[NotificationID] = t1.[NotificationID]
+
+                                    select top 4
+		                                    -- Notification data
+		                                    N.[NotificationID],
+		                                    N.[SubscriptionID],
+		                                    N.[ActivationID],
+		                                    N.[ReportID],
+		                                    N.[SnapShotDate],
+		                                    N.[DeliveryExtension],
+		                                    N.[ExtensionSettings],
+                                            N.[Locale],
+		                                    N.[Parameters],
+		                                    N.[SubscriptionLastRunTime],
+		                                    N.[ProcessStart],
+		                                    N.[NotificationEntered],
+		                                    N.[Attempt],
+		                                    N.[IsDataDriven],
+		                                    SUSER_SNAME(Owner.[Sid]),
+		                                    Owner.[UserName],
+		                                    -- Report Data
+		                                    O.[Path],
+		                                    N.[ReportZone],
+		                                    O.[Type],
+		                                    SD.NtSecDescPrimary,
+                                            N.[Version],
+                                            Owner.[AuthType]
+	                                    from 
+		                                    [Notifications] N with (TABLOCKX) inner join [Catalog] O on O.[ItemID] = N.[ReportID]
+		                                    inner join [Users] Owner on N.SubscriptionOwnerID = Owner.UserID
+		                                    left outer join [SecData] SD on O.[PolicyID] = SD.[PolicyID] AND SD.AuthType = Owner.AuthType
+	                                    where 
+		                                    N.[BatchID] = @BatchID
+                                    ORDER BY [NotificationEntered]
+                                    
